@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#090909">
+<meta name="description" content="Jimmy — your personal AI assistant.">
+<title>Jimmy — Personal AI</title>
+<style>
+:root{color-scheme:dark;--bg:#080808;--panel:#111;--panel2:#171717;--line:#292929;--text:#f5f5f5;--muted:#999;--red:#ed1c2e;--red2:#a90e1c}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{min-height:100dvh;display:flex;justify-content:center}
+button,input,textarea{font:inherit}button{cursor:pointer;color:inherit}
+.app{width:100%;max-width:900px;min-height:100dvh;display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% -20%,#301015 0,transparent 42%),var(--bg)}
+header{height:66px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#090909ed;backdrop-filter:blur(14px);z-index:3}
+.brand{display:flex;align-items:center;gap:11px}.logo{width:38px;height:38px;border-radius:13px;background:linear-gradient(145deg,#ff3345,#8d0714);display:grid;place-items:center;font-weight:900;font-size:20px;box-shadow:0 0 24px #ed1c2e44}.brand-name{font-size:18px;font-weight:800;letter-spacing:.08em}.sub{font-size:10px;color:var(--muted);letter-spacing:.16em}
+.header-actions{display:flex;gap:8px}.iconbtn,.smallbtn{border:1px solid var(--line);background:var(--panel2);border-radius:11px;padding:8px 11px}.iconbtn{width:39px;height:39px;padding:0;font-size:18px}
+main{flex:1;display:flex;flex-direction:column;padding:22px 16px 10px;overflow:hidden}
+.welcome{text-align:center;margin:auto auto 24px;max-width:560px}.orb{width:76px;height:76px;margin:0 auto 16px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ff7b86,#ed1c2e 42%,#56000b 78%);box-shadow:0 0 45px #ed1c2e55, inset 0 0 15px #fff5;display:grid;place-items:center;font-size:30px;font-weight:900}.welcome h1{font-size:30px;line-height:1.15;margin:0 0 8px}.welcome p{color:var(--muted);margin:0}.suggestions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:22px}.suggestion{background:#121212;border:1px solid var(--line);border-radius:14px;padding:12px;text-align:left;color:#ddd;font-size:13px}.suggestion b{display:block;color:#fff;margin-bottom:3px}
+#messages{display:flex;flex-direction:column;gap:16px;width:100%;max-width:760px;margin:0 auto 18px}
+.msg{display:flex;gap:10px;align-items:flex-start;max-width:100%}.msg.user{justify-content:flex-end}.avatar{width:29px;height:29px;flex:0 0 29px;border-radius:10px;background:#401018;color:#ff6875;display:grid;place-items:center;font-size:12px;font-weight:800}.bubble{max-width:min(84%,650px);padding:12px 14px;border:1px solid var(--line);background:#141414;border-radius:5px 16px 16px 16px;white-space:pre-wrap;overflow-wrap:anywhere}.user .bubble{background:#321016;border-color:#68202b;border-radius:16px 5px 16px 16px}.msg small{display:block;color:var(--muted);font-size:10px;margin-bottom:4px}
+.typing{color:var(--muted);font-size:13px;padding:4px 0}
+.composer-wrap{position:sticky;bottom:0;padding:10px 12px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,#080808 18%)}
+.composer{max-width:760px;margin:auto;border:1px solid #383838;background:#151515;border-radius:20px;padding:8px;display:flex;align-items:flex-end;gap:7px;box-shadow:0 8px 35px #0008}
+#prompt{flex:1;min-height:42px;max-height:140px;resize:none;border:0;outline:0;background:transparent;color:var(--text);padding:10px 7px}
+.send,.mic{width:42px;height:42px;border:0;border-radius:14px;display:grid;place-items:center;font-size:18px}.send{background:var(--red);font-weight:800}.mic{background:#292929}.mic.listening{background:#65101b;box-shadow:0 0 0 3px #ed1c2e33}
+.footer-note{text-align:center;color:#777;font-size:10px;margin:8px 0 0}
+.overlay{position:fixed;inset:0;background:#000a;z-index:8;display:none;align-items:flex-end;justify-content:center}.overlay.open{display:flex}.sheet{width:100%;max-width:600px;background:#141414;border:1px solid var(--line);border-radius:22px 22px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));}.sheet h2{margin:0 0 14px}.field{display:block;margin:12px 0;color:#bbb;font-size:13px}.field input{display:block;width:100%;margin-top:6px;padding:12px;border-radius:10px;border:1px solid var(--line);background:#090909;color:#fff}.sheet-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}.primary{background:var(--red);border:0;border-radius:10px;padding:10px 15px;font-weight:700}.mutebtn{background:#242424;border:1px solid var(--line);border-radius:10px;padding:10px 15px}
+@media(min-width:700px){main{padding-top:35px}.welcome h1{font-size:36px}.composer-wrap{padding-bottom:18px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand"><div class="logo">J</div><div><div class="brand-name">JIMMY</div><div class="sub">YOUR PERSONAL AI</div></div></div>
+  <div class="header-actions"><button class="iconbtn" id="newChat" title="New chat" aria-label="New chat">＋</button><button class="iconbtn" id="settings" title="Settings" aria-label="Settings">⚙</button></div>
+</header>
+<main id="main">
+  <section class="welcome" id="welcome">
+    <div class="orb">J</div><h1>What's on your mind?</h1><p>I'm Jimmy. Let's figure it out and get things done.</p>
+    <div class="suggestions">
+      <button class="suggestion" data-prompt="Research this topic and explain what matters: "><b>⌕ Research</b>Find answers and useful sources</button>
+      <button class="suggestion" data-prompt="Help me plan and complete this task: "><b>⚡ Get things done</b>Break a goal into real steps</button>
+      <button class="suggestion" data-prompt="Help me write or improve this code: "><b>⌘ Build something</b>Code, debug, and create</button>
+      <button class="suggestion" data-prompt="Help me think through this decision: "><b>✧ Think it through</b>Compare ideas and options</button>
+    </div>
+  </section>
+  <section id="messages" aria-live="polite"></section>
+  <div id="typing" class="typing" hidden>Jimmy is thinking…</div>
+</main>
+<div class="composer-wrap">
+  <div class="composer"><button class="mic" id="mic" title="Voice input" aria-label="Voice input">🎙</button><textarea id="prompt" rows="1" placeholder="Message Jimmy…" enterkeyhint="send"></textarea><button class="send" id="send" aria-label="Send">➤</button></div>
+  <div class="footer-note">Jimmy can make mistakes. Check important information.</div>
+</div>
+</div>
+<div class="overlay" id="settingsOverlay">
+  <div class="sheet">
+    <h2>Jimmy settings</h2>
+    <label class="field">Backend address
+      <input id="apiUrl" placeholder="https://your-jimmy-server.example.com">
+    </label>
+    <label class="field">Private access token
+      <input id="accessToken" type="password" placeholder="Your private token">
+    </label>
+    <label class="field" style="display:flex;align-items:center;gap:10px">Voice replies
+      <input id="speakToggle" type="checkbox" style="width:auto;margin:0">
+    </label>
+    <p style="color:#888;font-size:12px">These settings are stored only in this browser on this device. Never paste a model-provider API key here. Jimmy's server should keep that key private.</p>
+    <div class="sheet-actions"><button class="mutebtn" id="closeSettings">Cancel</button><button class="primary" id="saveSettings">Save settings</button></div>
+  </div>
+</div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const store = {
+    get: key => localStorage.getItem("jimmy."+key) || "",
+    set: (key,value) => localStorage.setItem("jimmy."+key,value)
+  };
+  let conversationId = sessionStorage.getItem("jimmy.conversation") || "";
+  let busy = false;
+  const messages = $("messages");
+  const welcome = $("welcome");
+  const prompt = $("prompt");
+
+  function addMessage(role, content) {
+    welcome.hidden = true;
+    const row = document.createElement("div");
+    row.className = "msg " + (role === "user" ? "user" : "assistant");
+    if (role !== "user") {
+      const avatar = document.createElement("div");
+      avatar.className = "avatar"; avatar.textContent = "J"; row.appendChild(avatar);
+    }
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    const label = document.createElement("small");
+    label.textContent = role === "user" ? "YOU" : "JIMMY";
+    const body = document.createElement("div");
+    body.textContent = content;
+    bubble.append(label, body); row.appendChild(bubble); messages.appendChild(row);
+    window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"});
+    return body;
+  }
+
+  // Restore the saved conversation when the app loads, so a refresh
+  // doesn't show an empty screen even though the server remembers it.
+  async function restoreHistory() {
+    const api = store.get("apiUrl").replace(/\/+$/,"");
+    const token = store.get("accessToken");
+    if (!api || !token || !conversationId) return;
+    try {
+      const response = await fetch(api + "/api/history/" + encodeURIComponent(conversationId), {
+        headers:{"Authorization":"Bearer "+token}
+      });
+      if (!response.ok) return;
+      const data = await response.json().catch(()=>({}));
+      const items = Array.isArray(data.messages) ? data.messages : [];
+      items.forEach(m => addMessage(m.role === "user" ? "user" : "assistant", m.content || ""));
+    } catch (err) {
+      // History is a nice-to-have on load; a failed restore just
+      // leaves the welcome screen up.
+    }
+  }
+  restoreHistory();
+
+  async function sendMessage() {
+    const text = prompt.value.trim();
+    if (!text || busy) return;
+    const api = store.get("apiUrl").replace(/\/+$/,"");
+    const token = store.get("accessToken");
+    if (!api || !token) {
+      addMessage("assistant","Before I can connect to my AI brain, open Settings and enter the secure backend address and access token. The screen is ready, but no AI model is connected yet.");
+      return;
+    }
+    prompt.value = ""; prompt.style.height = "42px";
+    addMessage("user",text); busy = true; $("send").disabled = true; $("typing").hidden = false;
+    try {
+      // 100s timeout: without one, a hung server leaves "Jimmy is
+      // thinking…" on screen forever with the send button locked.
+      const controller = new AbortController();
+      const timeout = setTimeout(()=>controller.abort(), 100000);
+      let response;
+      try {
+        response = await fetch(api + "/api/chat", {
+          method:"POST",
+          headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
+          body:JSON.stringify({message:text,conversation_id:conversationId || null}),
+          signal: controller.signal
+        });
+      } finally { clearTimeout(timeout); }
+      const data = await response.json().catch(()=>({}));
+      if (!response.ok) throw new Error(data.detail || ("Server error "+response.status));
+      if (data.conversation_id) {
+        conversationId = data.conversation_id;
+        sessionStorage.setItem("jimmy.conversation",conversationId);
+      }
+      const answer = data.reply || data.response || "The server returned no reply.";
+      addMessage("assistant",answer);
+      if (store.get("speak") === "yes" && "speechSynthesis" in window) {
+        speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance(answer));
+      }
+    } catch (err) {
+      const detail = err.name === "AbortError"
+        ? "The server took too long to answer (over 100 seconds)."
+        : "I couldn't reach my AI server: "+err.message;
+      addMessage("assistant",detail+"\n\nCheck the backend address, internet connection, and access token in Settings.");
+    } finally {
+      busy = false; $("send").disabled = false; $("typing").hidden = true; prompt.focus();
+    }
+  }
+
+  $("send").addEventListener("click",sendMessage);
+  prompt.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage();}});
+  prompt.addEventListener("input",()=>{prompt.style.height="42px";prompt.style.height=Math.min(prompt.scrollHeight,140)+"px";});
+  document.querySelectorAll(".suggestion").forEach(btn=>btn.addEventListener("click",()=>{prompt.value=btn.dataset.prompt;prompt.focus();}));
+  $("newChat").addEventListener("click",()=>{messages.replaceChildren();welcome.hidden=false;conversationId="";sessionStorage.removeItem("jimmy.conversation");});
+  $("settings").addEventListener("click",()=>{$("apiUrl").value=store.get("apiUrl");$("accessToken").value=store.get("accessToken");$("speakToggle").checked=store.get("speak")==="yes";$("settingsOverlay").classList.add("open");});
+  $("closeSettings").addEventListener("click",()=>$("settingsOverlay").classList.remove("open"));
+  $("saveSettings").addEventListener("click",()=>{
+    const api = $("apiUrl").value.trim();
+    // The access token travels in a header to this address — over plain
+    // http anyone on the network can read it, so refuse non-https.
+    if (api && !api.startsWith("https://")) {
+      addMessage("assistant","That backend address must start with https:// — otherwise your access token would travel over plain http where anyone on the network can read it.");
+      return;
+    }
+    store.set("apiUrl",api);
+    store.set("accessToken",$("accessToken").value.trim());
+    store.set("speak",$("speakToggle").checked ? "yes" : "no");
+    $("settingsOverlay").classList.remove("open");
+    addMessage("assistant","Settings saved on this device. When your secure backend is running, send me a message to test the connection.");
+  });
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  $("mic").addEventListener("click",()=>{
+    if (!SpeechRecognition) {addMessage("assistant","Voice input isn't supported by this browser. Try Chrome on Android.");return;}
+    const rec = new SpeechRecognition(); rec.lang=navigator.language||"en-US"; rec.interimResults=false; rec.maxAlternatives=1;
+    $("mic").classList.add("listening");
+    rec.onresult=e=>{prompt.value=(prompt.value+" "+e.results[0][0].transcript).trim();prompt.dispatchEvent(new Event("input"));};
+    rec.onerror=e=>{addMessage("assistant","Voice input didn't work ("+(e.error||"microphone error")+"). Check the browser's microphone permission and try again.");};
+    rec.onend=()=>$("mic").classList.remove("listening"); rec.start();
+  });
+})();
+</script>
+</body>
+</html>
