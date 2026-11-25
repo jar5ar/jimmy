@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: jimmy-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn jimmy_server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: JIMMY_ACCESS_TOKEN
+        generateValue: true
+      - key: MODEL_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai/
+      - key: MODEL_API_KEY
+        sync: false
+      - key: BRAVE_SEARCH_API_KEY
+        sync: false
+      - key: MODEL_NAME
+        value: gemini-2.0-flash
+      - key: ALLOWED_ORIGIN
+        value: https://jar5ar.github.io
