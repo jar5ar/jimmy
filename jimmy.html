@@ -76,6 +76,17 @@ main{flex:1;display:flex;flex-direction:column;padding:22px 16px 10px;overflow:h
     get: key => localStorage.getItem("jimmy."+key) || "",
     set: (key,value) => localStorage.setItem("jimmy."+key,value)
   };
+  // One-tap setup: ?api=...&token=... saves the settings, then cleans the URL.
+  try {
+    const params = new URLSearchParams(location.search);
+    const apiParam = (params.get("api") || "").trim();
+    const tokenParam = (params.get("token") || "").trim();
+    if (apiParam || tokenParam) {
+      if (apiParam) store.set("apiUrl", apiParam);
+      if (tokenParam) store.set("accessToken", tokenParam);
+      history.replaceState(null, "", location.pathname + location.hash);
+    }
+  } catch (e) {}
   let conversationId = sessionStorage.getItem("jimmy.conversation") || "";
   let busy = false;
   const messages = $("messages");
