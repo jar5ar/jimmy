@@ -296,26 +296,119 @@ def decide_approval(approval_id: int, status: str) -> bool:
         return cur.rowcount > 0
 
 
-def execute_approval(approval: dict) -> str:
-    """Run an approved action. Only local actions really execute; anything
-    needing an outside connection is recorded as approved and reported
-    honestly as not sent, because no such integration exists yet."""
-    action = approval["action"]
-    details = approval["details"]
-    if action == "delete_memory":
-        ok = delete_memory(int(details.get("memory_id", -1)))
-        return f"Deleted memory #{details.get('memory_id')}." if ok else "That memory was already gone."
-    if action == "delete_task":
-        ok = delete_task(int(details.get("task_id", -1)))
-        return f"Deleted task #{details.get('task_id')}." if ok else "That task was already gone."
-    if action == "clear_history":
-        cid = details.get("conversation_id", "")
-        with db() as con:
+def approve_and_execute(approval_id: int) -> dict:
+    """
+    Atomically consume a pending approval and execute its
+    supported local action.
+
+    BEGIN IMMEDIATE prevents two simultaneous requests from
+    consuming and executing the same approval.
+    """
+    with db() as con:
+        con.execute("BEGIN IMMEDIATE")
+
+        row = con.execute(
+            """
+            SELECT id, conversation_id, action, details
+            FROM approvals
+            WHERE id=? AND status='pending'
+            """,
+            (approval_id,)
+        ).fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=404,
+                detail="No pending approval with that id."
+            )
+
+        action = row["action"]
+        details = json.loads(row["details"] or "{}")
+
+        result = "Approved and recorded."
+
+        if action == "delete_memory":
+            memory_id = int(details.get("memory_id", -1))
+
             cur = con.execute(
-                "DELETE FROM messages WHERE conversation_id=?", (cid,))
-            return f"Cleared {cur.rowcount} messages from this conversation."
-    return (f"Approved and recorded. Jimmy has no connection to "
-            f"{action} yet, so nothing was sent, published, or spent.")
+                "DELETE FROM memories WHERE id=?",
+                (memory_id,)
+            )
+
+            result = (
+                f"Deleted memory #{memory_id}."
+                if cur.rowcount > 0
+                else "That memory was already gone."
+            )
+
+            final_status = "executed"
+
+        elif action == "delete_task":
+            task_id = int(details.get("task_id", -1))
+
+            cur = con.execute(
+                "DELETE FROM tasks WHERE id=?",
+                (task_id,)
+            )
+
+            result = (
+                f"Deleted task #{task_id}."
+                if cur.rowcount > 0
+                else "That task was already gone."
+            )
+
+            final_status = "executed"
+
+        elif action == "clear_history":
+            target_cid = details.get("conversation_id", "")
+
+            owned = con.execute(
+                "SELECT id FROM conversations "
+                "WHERE id=? AND owner='owner'",
+                (target_cid,)
+            ).fetchone()
+
+            if not owned:
+                result = "Conversation not found. Nothing was deleted."
+                final_status = "approved"
+            else:
+                cur = con.execute(
+                    "DELETE FROM messages WHERE conversation_id=?",
+                    (target_cid,)
+                )
+
+                result = (
+                    f"Cleared {cur.rowcount} messages "
+                    f"from this conversation."
+                )
+                final_status = "executed"
+
+        else:
+            result = (
+                f"Approved and recorded. Jimmy has no integration "
+                f"for {action} yet, so nothing was sent, published, "
+                f"or spent."
+            )
+            final_status = "approved"
+
+        con.execute(
+            """
+            UPDATE approvals
+            SET status=?, decided_at=?
+            WHERE id=? AND status='pending'
+            """,
+            (
+                final_status,
+                datetime.now(timezone.utc).isoformat(),
+                approval_id
+            )
+        )
+
+        return {
+            "id": approval_id,
+            "status": final_status,
+            "result": result
+        }
 
 
 # ---- web search (stdlib only; Brave key or keyless Wikipedia) ----
@@ -498,7 +591,7 @@ async def _call_model(messages: list) -> str:
     if MODEL_API_KEY:
         headers["Authorization"] = f"Bearer {MODEL_API_KEY}"
     try:
-        async with httpx.AsyncClient(timeout=90) as client:
+        async with httpx.AsyncClient(timeout=300) as client:
             result = await client.post(
                 f"{MODEL_BASE_URL}/chat/completions",
                 headers=headers,
@@ -546,14 +639,17 @@ async def chat(body: ChatRequest, authorization: Optional[str] = Header(default=
     pending = pending_approval(cid)
     word = body.message.strip().lower()
     if pending and word in APPROVE_WORDS:
-        decide_approval(pending["id"], "approved")
-        result = execute_approval(pending)
-        reply = f"Approved. {result}"
+        outcome = approve_and_execute(pending["id"])
+        reply = f"Approved. {outcome['result']}"
         save_message(cid, "user", body.message)
         save_message(cid, "assistant", reply)
         return {"conversation_id": cid, "reply": reply}
     if pending and word in DENY_WORDS:
-        decide_approval(pending["id"], "denied")
+        if not decide_approval(pending["id"], "denied"):
+            raise HTTPException(
+                status_code=409,
+                detail="This approval has already been decided."
+            )
         reply = "Cancelled — nothing was done."
         save_message(cid, "user", body.message)
         save_message(cid, "assistant", reply)
@@ -636,11 +732,18 @@ def get_memories(authorization: Optional[str] = Header(default=None)):
 
 
 @app.delete("/api/memories/{memory_id}")
-def forget_memory(memory_id: int, authorization: Optional[str] = Header(default=None)):
+def forget_memory(
+    memory_id: int,
+    authorization: Optional[str] = Header(default=None)
+):
     require_auth(authorization)
-    if not delete_memory(memory_id):
-        raise HTTPException(404, "No memory with that id")
-    return {"id": memory_id, "deleted": True}
+    raise HTTPException(
+        status_code=403,
+        detail=(
+            "Direct memory deletion is disabled. "
+            "Request approval through Jimmy's chat before deleting."
+        )
+    )
 
 
 @app.get("/api/approvals")
@@ -658,20 +761,12 @@ def get_approvals(authorization: Optional[str] = Header(default=None)):
 
 
 @app.post("/api/approvals/{approval_id}/approve")
-def approve_endpoint(approval_id: int, authorization: Optional[str] = Header(default=None)):
+def approve_endpoint(
+    approval_id: int,
+    authorization: Optional[str] = Header(default=None)
+):
     require_auth(authorization)
-    with db() as con:
-        row = con.execute(
-            "SELECT id,conversation_id,action,details FROM approvals "
-            "WHERE id=? AND status='pending'", (approval_id,)
-        ).fetchone()
-    if not row:
-        raise HTTPException(404, "No pending approval with that id")
-    approval = {"id": row["id"], "action": row["action"],
-                "details": json.loads(row["details"] or "{}")}
-    decide_approval(approval_id, "approved")
-    return {"id": approval_id, "status": "approved",
-            "result": execute_approval(approval)}
+    return approve_and_execute(approval_id)
 
 
 @app.post("/api/approvals/{approval_id}/deny")
